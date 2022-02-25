@@ -10,6 +10,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.FrameLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
@@ -20,6 +22,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.*
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.libraries.places.api.Places
 import com.google.android.libraries.places.api.net.PlacesClient
@@ -260,7 +263,24 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
     override fun onMapReady(googleMap: GoogleMap) {
         this.map = googleMap
 
+        this.map?.setInfoWindowAdapter(object : GoogleMap.InfoWindowAdapter {
+            // Return null here, so that getInfoContents() is called next.
+            override fun getInfoWindow(arg0: Marker): View? {
+                return null
+            }
 
+            override fun getInfoContents(marker: Marker): View {
+                // Inflate the layouts for the info window, title and snippet.
+                val infoWindow = layoutInflater.inflate(R.layout.custom_info_content,
+                      null)
+                val title = infoWindow.findViewById<TextView>(R.id.title)
+                title.text = marker.title
+                val snippet = infoWindow.findViewById<TextView>(R.id.snippet)
+                snippet.text = marker.snippet
+
+                return infoWindow
+            }
+        })
         getLocationPermission()
 
         updateLocationUI()
