@@ -10,7 +10,8 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.webkit.WebSettings
+import android.widget.Button
+import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -22,6 +23,10 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.libraries.places.api.Places
 import com.google.android.libraries.places.api.net.PlacesClient
+import com.loopj.android.http.AsyncHttpClient
+import com.loopj.android.http.JsonHttpResponseHandler
+import cz.msebera.android.httpclient.Header
+import org.json.JSONObject
 import kotlin.math.log
 
 class MapsFragment : Fragment(), OnMapReadyCallback {
@@ -36,6 +41,8 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
 
     private lateinit var placesClient: PlacesClient
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
+    private var restaurantsLatLngs: ArrayList<LatLng?> = arrayListOf()
+    private var restaurantsNames: ArrayList<String?> = arrayListOf()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -59,9 +66,97 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
                     it
                 )
         }
+        val restaurants = view.findViewById<Button>(R.id.restaurants_buttons)
+        restaurants.setOnClickListener {
+            findNearByRestaurants()
+        }
 
     }
+    private fun findNearByRestaurants(){
+        val client = AsyncHttpClient()
+        val url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lastKnownLocation?.latitude},${lastKnownLocation?.longitude}&radius=10000&type=restaurant&keyword=cousins&key=${getString(R.string.google_maps_key)}"
+        client[url, object : JsonHttpResponseHandler() {
+            override fun onSuccess(
+                statusCode: Int, headers: Array<Header?>?,
+                response: JSONObject
+            ) {
+                extractRestaurantNamesAndLocation(response)
+                Log.d("MapsFragment", "JSON: $response")
+                Toast.makeText(
+                    activity, "Request Succeeded",
+                    Toast.LENGTH_SHORT
+                ).show()
+                try {
 
+
+
+                } catch (e: Exception) {
+                    Log.e("Bitcoin", e.toString())
+                }
+            }
+
+            override fun onFailure(
+                statusCode: Int, headers: Array<Header?>?, e: Throwable,
+                response: JSONObject
+            ) {
+
+                // called when response HTTP status is "4XX" (eg. 401, 403, 404)
+                Log.d("Bitcoin", "Request fail! Status code: $statusCode")
+                Log.d("Bitcoin", "Fail response: $response")
+                Log.e("ERROR", e.toString())
+                Toast.makeText(
+                    activity, "Request Failed",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }]
+    }
+    private fun extractRestaurantNamesAndLocation(response: JSONObject) {
+        val restaurantsArray = response.getJSONArray("results")
+        for (i in 0 until restaurantsArray.length()) {
+            val restJSONObject = restaurantsArray.getJSONObject(i)
+            val name = restJSONObject.getString("name")
+            restaurantsNames.add(name)
+            val geometry = restJSONObject.getJSONObject("geometry")
+            val location = geometry.getJSONObject("location")
+            val latLng = LatLng(location.getDouble("lat"),location.getDouble("lng"))
+            restaurantsLatLngs.add(latLng)
+            Log.i(TAG, "extractRestaurantNamesAndLocation: $name lat ${latLng.latitude} lng ${latLng.longitude}")
+        }
+    }
+    //    private fun openRestaurantsDialog(restaurantsJson: JSONObject) {
+//        val listener = DialogInterface.OnClickListener { dialog, which -> // The "which" argument contains the position of the selected item.
+//            val markerLatLng = likelyPlaceLatLngs[which]
+//            var markerSnippet = likelyPlaceAddresses[which]
+//            if (likelyPlaceAttributions[which] != null) {
+//                markerSnippet = """
+//                    $markerSnippet
+//                    ${likelyPlaceAttributions[which]}
+//                    """.trimIndent()
+//            }
+//
+//            if (markerLatLng == null) {
+//                return@OnClickListener
+//            }
+//
+//            // Add a marker for the selected place, with an info window
+//            // showing information about that place.
+//            map?.addMarker(MarkerOptions()
+//                .title(likelyPlaceNames[which])
+//                .position(markerLatLng)
+//                .snippet(markerSnippet))
+//
+//            // Position the map's camera at the location of the marker.
+//            map?.moveCamera(CameraUpdateFactory.newLatLngZoom(markerLatLng,
+//                DEFAULT_ZOOM.toFloat()))
+//        }
+//
+//        // Display the dialog.
+//        AlertDialog.Builder(this)
+//            .setTitle(R.string.pick_place)
+//            .setItems(likelyPlaceNames, listener)
+//            .show()
+//    }
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<String>,
