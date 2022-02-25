@@ -70,11 +70,15 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
                     it
                 )
         }
-        val restaurants = view.findViewById<Button>(R.id.restaurants_buttons)
+        val restaurants = view.findViewById<Button>(R.id.btn_restaurants)
         restaurants.setOnClickListener {
             findNearByRestaurants()
         }
+        val places = view.findViewById<Button>(R.id.btn_places)
         populateDummyData()
+        places.setOnClickListener {
+            openPlacesDialog()
+        }
     }
 
     private fun populateDummyData() {
