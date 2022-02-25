@@ -3,8 +3,6 @@ package com.minabeshara.easylocate
 import android.Manifest
 import android.content.pm.PackageManager
 import android.location.Location
-import androidx.fragment.app.Fragment
-
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -14,10 +12,10 @@ import android.widget.Button
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.Fragment
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.*
-
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
@@ -27,7 +25,7 @@ import com.loopj.android.http.AsyncHttpClient
 import com.loopj.android.http.JsonHttpResponseHandler
 import cz.msebera.android.httpclient.Header
 import org.json.JSONObject
-import kotlin.math.log
+
 
 class MapsFragment : Fragment(), OnMapReadyCallback {
     private var map: GoogleMap? = null
@@ -41,7 +39,7 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
 
     private lateinit var placesClient: PlacesClient
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
-    private var restaurantsLatLngs: ArrayList<LatLng?> = arrayListOf()
+    private var restaurantsLatLngs: ArrayList<LatLng> = arrayListOf()
     private var restaurantsNames: ArrayList<String?> = arrayListOf()
 
     override fun onCreateView(
@@ -72,14 +70,21 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
         }
 
     }
-    private fun findNearByRestaurants(){
+
+    private fun findNearByRestaurants() {
         val client = AsyncHttpClient()
-        val url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lastKnownLocation?.latitude},${lastKnownLocation?.longitude}&radius=10000&type=restaurant&keyword=cousins&key=${getString(R.string.google_maps_key)}"
+        val url =
+            "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lastKnownLocation?.latitude},${lastKnownLocation?.longitude}&radius=10000&type=restaurant&keyword=cousins&key=${
+                getString(
+                    R.string.google_maps_key
+                )
+            }"
         client[url, object : JsonHttpResponseHandler() {
             override fun onSuccess(
                 statusCode: Int, headers: Array<Header?>?,
                 response: JSONObject
             ) {
+
                 extractRestaurantNamesAndLocation(response)
                 Log.d("MapsFragment", "JSON: $response")
                 Toast.makeText(
@@ -87,7 +92,6 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
                     Toast.LENGTH_SHORT
                 ).show()
                 try {
-
 
 
                 } catch (e: Exception) {
@@ -111,6 +115,7 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
             }
         }]
     }
+
     private fun extractRestaurantNamesAndLocation(response: JSONObject) {
         val restaurantsArray = response.getJSONArray("results")
         for (i in 0 until restaurantsArray.length()) {
@@ -119,11 +124,35 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
             restaurantsNames.add(name)
             val geometry = restJSONObject.getJSONObject("geometry")
             val location = geometry.getJSONObject("location")
-            val latLng = LatLng(location.getDouble("lat"),location.getDouble("lng"))
+            val latLng = LatLng(location.getDouble("lat"), location.getDouble("lng"))
             restaurantsLatLngs.add(latLng)
-            Log.i(TAG, "extractRestaurantNamesAndLocation: $name lat ${latLng.latitude} lng ${latLng.longitude}")
+            Log.i(
+                TAG,
+                "extractRestaurantNamesAndLocation: $name lat ${latLng.latitude} lng ${latLng.longitude}"
+            )
+
+        }
+        viewRestaurantsOnMap()
+    }
+
+    private fun viewRestaurantsOnMap() {
+        for (i in 0 until restaurantsLatLngs.size) {
+
+            // below line is use to add marker to each location of our array list.
+            map?.addMarker(
+                MarkerOptions().position(restaurantsLatLngs.get(i)).title(
+                    restaurantsNames[i]
+                )
+            )
+
+            // below lin is use to zoom our camera on map.
+            map?.animateCamera(CameraUpdateFactory.zoomTo(18.0f))
+
+            // below line is use to move our camera to the specific location.
+            map?.moveCamera(CameraUpdateFactory.newLatLng(restaurantsLatLngs.get(i)))
         }
     }
+
     //    private fun openRestaurantsDialog(restaurantsJson: JSONObject) {
 //        val listener = DialogInterface.OnClickListener { dialog, which -> // The "which" argument contains the position of the selected item.
 //            val markerLatLng = likelyPlaceLatLngs[which]
@@ -280,8 +309,8 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
                             map?.uiSettings?.isMyLocationButtonEnabled = false
                         }
                     }
-                } ?: Log.i(TAG,"getDeviceLocation activity null")
-            }else{
+                } ?: Log.i(TAG, "getDeviceLocation activity null")
+            } else {
                 Log.i(TAG, "getDeviceLocation: not granted")
             }
         } catch (e: SecurityException) {
