@@ -3,6 +3,7 @@ package com.minabeshara.easylocate
 import android.Manifest
 import android.content.DialogInterface
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.location.Location
 import android.os.Bundle
 import android.util.Log
@@ -10,7 +11,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -20,10 +20,7 @@ import androidx.fragment.app.Fragment
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.*
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.Marker
-import com.google.android.gms.maps.model.MarkerOptions
+import com.google.android.gms.maps.model.*
 import com.google.android.libraries.places.api.Places
 import com.google.android.libraries.places.api.net.PlacesClient
 import com.loopj.android.http.AsyncHttpClient
@@ -40,7 +37,7 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
     private val defaultLocation = LatLng(-33.8523341, 151.2106085)
 
     private var locationPermissionGranted = false
-    private var lastKnownLocation: Location? = null
+    private var currentLocation: Location? = null
 
     private lateinit var placesClient: PlacesClient
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
@@ -55,6 +52,7 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
+
         return inflater.inflate(R.layout.fragment_maps, container, false)
     }
 
@@ -81,29 +79,29 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
 
     private fun populateDummyData() {
         likelyPlaceNames.add("Grand Kadri Hotel By Cristal Lebanon")
-        likelyPlaceLatLngs.add(LatLng(33.85148430277257,35.895525763213946))
+        likelyPlaceLatLngs.add(LatLng(33.85148430277257, 35.895525763213946))
 
         likelyPlaceNames.add("Germanos - Pastry")
-        likelyPlaceLatLngs.add(LatLng(33.85217073479985,35.89477838111461))
+        likelyPlaceLatLngs.add(LatLng(33.85217073479985, 35.89477838111461))
 
         likelyPlaceNames.add("Malak el Tawook")
-        likelyPlaceLatLngs.add(LatLng(33.85334017189446,35.89438946093824))
+        likelyPlaceLatLngs.add(LatLng(33.85334017189446, 35.89438946093824))
 
         likelyPlaceNames.add("Z Burger House")
-        likelyPlaceLatLngs.add(LatLng(33.85454300475094,35.894561122304474))
+        likelyPlaceLatLngs.add(LatLng(33.85454300475094, 35.894561122304474))
 
         likelyPlaceNames.add("College Oriental")
-        likelyPlaceLatLngs.add(LatLng(33.85129821373707,35.89446263654391))
+        likelyPlaceLatLngs.add(LatLng(33.85129821373707, 35.89446263654391))
 
         likelyPlaceNames.add("VERO MODA")
-        likelyPlaceLatLngs.add(LatLng(33.85048738635312,35.89664059012788))
+        likelyPlaceLatLngs.add(LatLng(33.85048738635312, 35.89664059012788))
 
     }
 
     private fun findNearByRestaurants() {
         val client = AsyncHttpClient()
         val url =
-            "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lastKnownLocation?.latitude},${lastKnownLocation?.longitude}&radius=10000&type=restaurant&keyword=cousins&key=${
+            "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${currentLocation?.latitude},${currentLocation?.longitude}&radius=10000&type=restaurant&keyword=cousins&key=${
                 getString(
                     R.string.google_maps_key
                 )
@@ -116,33 +114,81 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
 
                 extractRestaurantNamesAndLocation(response)
                 Log.d("MapsFragment", "JSON: $response")
-                Toast.makeText(
-                    activity, "Request Succeeded",
-                    Toast.LENGTH_SHORT
-                ).show()
-                try {
 
-
-                } catch (e: Exception) {
-                    Log.e("Bitcoin", e.toString())
-                }
             }
 
             override fun onFailure(
                 statusCode: Int, headers: Array<Header?>?, e: Throwable,
                 response: JSONObject
             ) {
-
-                // called when response HTTP status is "4XX" (eg. 401, 403, 404)
-                Log.d("Bitcoin", "Request fail! Status code: $statusCode")
-                Log.d("Bitcoin", "Fail response: $response")
-                Log.e("ERROR", e.toString())
                 Toast.makeText(
                     activity, "Request Failed",
                     Toast.LENGTH_SHORT
                 ).show()
             }
         }]
+    }
+
+    private fun requestDirection(location: LatLng){
+        val client = AsyncHttpClient()
+        val url =
+            "https://maps.googleapis.com/maps/api/directions/json?origin=${currentLocation?.latitude},${currentLocation?.longitude}&destination=${location.latitude},${location.longitude}&key=${
+                getString(
+                    R.string.google_maps_key
+                )
+            }"
+        client[url, object : JsonHttpResponseHandler() {
+            override fun onSuccess(
+                statusCode: Int, headers: Array<Header?>?,
+                response: JSONObject
+            ) {
+                Log.d(TAG, "onSuccess: $response")
+                extractPolyLine(response)
+            }
+
+            override fun onFailure(
+                statusCode: Int, headers: Array<Header?>?, e: Throwable,
+                response: JSONObject
+            ) {
+                Toast.makeText(
+                    activity, "Request Failed",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }]
+    }
+
+    private fun extractPolyLine(response: JSONObject) {
+        val directionHelper = DirectionHelper()
+       var routes = directionHelper.parse(response)
+
+        var points: ArrayList<LatLng?>
+        var lineOptions: PolylineOptions? = null
+        // Traversing through all the routes
+        // Traversing through all the routes
+        for (i in routes.indices) {
+            points = ArrayList()
+            lineOptions = PolylineOptions()
+
+            // Fetching i-th route
+            val path = routes[i]
+
+            // Fetching all the points in i-th route
+            for (j in path.indices) {
+                val point = path[j]
+                val lat = point["lat"]!!.toDouble()
+                val lng = point["lng"]!!.toDouble()
+                val position = LatLng(lat, lng)
+                points.add(position)
+            }
+
+            // Adding all the points in the route to LineOptions
+            lineOptions.addAll(points)
+            lineOptions.width(10f)
+            lineOptions.color(Color.BLUE)
+            Log.e(TAG, "PolylineOptions Decoded")
+        }
+            map?.addPolyline(lineOptions)
     }
 
     private fun extractRestaurantNamesAndLocation(response: JSONObject) {
@@ -271,8 +317,10 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
 
             override fun getInfoContents(marker: Marker): View {
                 // Inflate the layouts for the info window, title and snippet.
-                val infoWindow = layoutInflater.inflate(R.layout.custom_info_content,
-                      null)
+                val infoWindow = layoutInflater.inflate(
+                    R.layout.custom_info_content,
+                    null
+                )
                 val title = infoWindow.findViewById<TextView>(R.id.title)
                 title.text = marker.title
                 val snippet = infoWindow.findViewById<TextView>(R.id.snippet)
@@ -281,8 +329,13 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
                 return infoWindow
             }
         })
-        getLocationPermission()
+        this.map?.let { map ->
+            map.setOnInfoWindowClickListener {
+                requestDirection(LatLng(it.position.latitude, it.position.longitude))
+            }
+        }
 
+        getLocationPermission()
         updateLocationUI()
         getDeviceLocation()
 
@@ -300,7 +353,7 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
             } else {
                 map?.isMyLocationEnabled = false
                 map?.uiSettings?.isMyLocationButtonEnabled = false
-                lastKnownLocation = null
+                currentLocation = null
                 getLocationPermission()
             }
         } catch (e: SecurityException) {
@@ -321,8 +374,8 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
                         if (task.isSuccessful) {
                             Log.i(TAG, "getDeviceLocation: task successful")
                             // Set the map's camera position to the current location of the device.
-                            lastKnownLocation = task.result
-                            if (lastKnownLocation != null) {
+                            currentLocation = task.result
+                            if (currentLocation != null) {
                                 Log.i(TAG, "getDeviceLocation: Location is not null")
                                 val lastKnownLocationLatLang =
                                     LatLng(task.result.latitude, task.result.longitude)
