@@ -1,6 +1,7 @@
 package com.minabeshara.easylocate
 
 import android.Manifest
+import android.content.DialogInterface
 import android.content.pm.PackageManager
 import android.location.Location
 import android.os.Bundle
@@ -10,6 +11,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -42,6 +44,9 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
     private var restaurantsLatLngs: ArrayList<LatLng> = arrayListOf()
     private var restaurantsNames: ArrayList<String?> = arrayListOf()
 
+    private var likelyPlaceNames: ArrayList<String?> = arrayListOf()
+    private var likelyPlaceLatLngs: ArrayList<LatLng?> = arrayListOf()
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -68,6 +73,27 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
         restaurants.setOnClickListener {
             findNearByRestaurants()
         }
+        populateDummyData()
+    }
+
+    private fun populateDummyData() {
+        likelyPlaceNames.add("Grand Kadri Hotel By Cristal Lebanon")
+        likelyPlaceLatLngs.add(LatLng(33.85148430277257,35.895525763213946))
+
+        likelyPlaceNames.add("Germanos - Pastry")
+        likelyPlaceLatLngs.add(LatLng(33.85217073479985,35.89477838111461))
+
+        likelyPlaceNames.add("Malak el Tawook")
+        likelyPlaceLatLngs.add(LatLng(33.85334017189446,35.89438946093824))
+
+        likelyPlaceNames.add("Z Burger House")
+        likelyPlaceLatLngs.add(LatLng(33.85454300475094,35.894561122304474))
+
+        likelyPlaceNames.add("College Oriental")
+        likelyPlaceLatLngs.add(LatLng(33.85129821373707,35.89446263654391))
+
+        likelyPlaceNames.add("VERO MODA")
+        likelyPlaceLatLngs.add(LatLng(33.85048738635312,35.89664059012788))
 
     }
 
@@ -153,39 +179,37 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
-    //    private fun openRestaurantsDialog(restaurantsJson: JSONObject) {
-//        val listener = DialogInterface.OnClickListener { dialog, which -> // The "which" argument contains the position of the selected item.
-//            val markerLatLng = likelyPlaceLatLngs[which]
-//            var markerSnippet = likelyPlaceAddresses[which]
-//            if (likelyPlaceAttributions[which] != null) {
-//                markerSnippet = """
-//                    $markerSnippet
-//                    ${likelyPlaceAttributions[which]}
-//                    """.trimIndent()
-//            }
-//
-//            if (markerLatLng == null) {
-//                return@OnClickListener
-//            }
-//
-//            // Add a marker for the selected place, with an info window
-//            // showing information about that place.
-//            map?.addMarker(MarkerOptions()
-//                .title(likelyPlaceNames[which])
-//                .position(markerLatLng)
-//                .snippet(markerSnippet))
-//
-//            // Position the map's camera at the location of the marker.
-//            map?.moveCamera(CameraUpdateFactory.newLatLngZoom(markerLatLng,
-//                DEFAULT_ZOOM.toFloat()))
-//        }
-//
-//        // Display the dialog.
-//        AlertDialog.Builder(this)
-//            .setTitle(R.string.pick_place)
-//            .setItems(likelyPlaceNames, listener)
-//            .show()
-//    }
+    private fun openPlacesDialog() {
+        val listener =
+            DialogInterface.OnClickListener { dialog, which -> // The "which" argument contains the position of the selected item.
+                val markerLatLng = likelyPlaceLatLngs[which] ?: return@OnClickListener
+
+                // Add a marker for the selected place, with an info window
+                // showing information about that place.
+                map?.addMarker(
+                    MarkerOptions()
+                        .title(likelyPlaceNames[which])
+                        .position(markerLatLng)
+                )
+
+                // Position the map's camera at the location of the marker.
+                map?.moveCamera(
+                    CameraUpdateFactory.newLatLngZoom(
+                        markerLatLng,
+                        DEFAULT_ZOOM.toFloat()
+                    )
+                )
+            }
+
+        // Display the dialog.
+        context?.let {
+            AlertDialog.Builder(it)
+                .setTitle("Pick place")
+                .setItems(likelyPlaceNames.toTypedArray(), listener)
+                .show()
+        }
+    }
+
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<String>,
@@ -236,9 +260,7 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
     override fun onMapReady(googleMap: GoogleMap) {
         this.map = googleMap
 
-//        val sydney = LatLng(-34.0, 151.0)
-//        googleMap.addMarker(MarkerOptions().position(sydney).title("Marker in Sydney"))
-//        googleMap.moveCamera(CameraUpdateFactory.newLatLng(sydney))
+
         getLocationPermission()
 
         updateLocationUI()
@@ -288,7 +310,9 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
                                 Log.i(TAG, "getDeviceLocation: ${map?.isMyLocationEnabled}")
                                 map?.addMarker(
                                     MarkerOptions().position(lastKnownLocationLatLang)
-                                        .title("MyLocation")
+                                        .snippet("snippet data")
+                                        .title("My Location")
+
                                 )
 
                                 map?.moveCamera(
