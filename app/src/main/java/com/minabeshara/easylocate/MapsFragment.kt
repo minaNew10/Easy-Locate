@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.DialogInterface
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.location.Address
+import android.location.Geocoder
 import android.location.Location
 import android.os.Bundle
 import android.util.Log
@@ -11,6 +13,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import androidx.appcompat.widget.SearchView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -27,6 +30,7 @@ import com.loopj.android.http.AsyncHttpClient
 import com.loopj.android.http.JsonHttpResponseHandler
 import cz.msebera.android.httpclient.Header
 import org.json.JSONObject
+import java.io.IOException
 
 
 class MapsFragment : Fragment(), OnMapReadyCallback {
@@ -79,6 +83,48 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
         places.setOnClickListener {
             openPlacesDialog()
         }
+
+        val searchView = view.findViewById<SearchView>(R.id.idSearchView);
+        searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String): Boolean {
+                val location = searchView.query.toString()
+
+                var addressList: List<Address>? = null
+
+                if (location != null || location == "") {
+                    val geocoder = Geocoder(context)
+                    try {
+                        addressList = geocoder.getFromLocationName(location, 1)
+                    } catch (e: IOException) {
+                        e.printStackTrace()
+                    }
+                    var address: Address? = null
+                    addressList?.let { list ->
+                        if (list?.size > 0)
+                            address = list[0]
+
+                    }
+
+                    var latLng: LatLng? = null
+                    address?.let {
+                        latLng = LatLng(it.latitude, it.longitude)
+                    }
+
+
+                    latLng?.let {
+                        map?.addMarker(MarkerOptions().position(it).title(location))
+                        map?.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 10f))
+                    } ?: Toast.makeText(activity,"Not found",Toast.LENGTH_LONG).show()
+
+                }
+                return false
+            }
+
+            override fun onQueryTextChange(newText: String): Boolean {
+                return false
+            }
+        })
+        mapFragment?.getMapAsync(this)
     }
 
     private fun populateDummyData() {
@@ -133,7 +179,7 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
         }]
     }
 
-    private fun requestDirection(location: LatLng){
+    private fun requestDirection(location: LatLng) {
         val client = AsyncHttpClient()
         val url =
             "https://maps.googleapis.com/maps/api/directions/json?origin=${currentLocation?.latitude},${currentLocation?.longitude}&destination=${location.latitude},${location.longitude}&key=${
@@ -164,20 +210,16 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
 
     private fun extractPolyLine(response: JSONObject) {
         val directionHelper = DirectionHelper()
-       var routes = directionHelper.parse(response)
+        var routes = directionHelper.parse(response)
 
         var points: ArrayList<LatLng?>
         var lineOptions: PolylineOptions? = null
-        // Traversing through all the routes
-        // Traversing through all the routes
         for (i in routes.indices) {
             points = ArrayList()
             lineOptions = PolylineOptions()
 
-            // Fetching i-th route
             val path = routes[i]
 
-            // Fetching all the points in i-th route
             for (j in path.indices) {
                 val point = path[j]
                 val lat = point["lat"]!!.toDouble()
@@ -186,13 +228,12 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
                 points.add(position)
             }
 
-            // Adding all the points in the route to LineOptions
             lineOptions.addAll(points)
             lineOptions.width(10f)
             lineOptions.color(Color.BLUE)
             Log.e(TAG, "PolylineOptions Decoded")
         }
-            map?.addPolyline(lineOptions)
+        map?.addPolyline(lineOptions)
     }
 
     private fun extractRestaurantNamesAndLocation(response: JSONObject) {
