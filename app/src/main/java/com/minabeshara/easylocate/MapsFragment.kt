@@ -2,6 +2,7 @@ package com.minabeshara.easylocate
 
 import android.Manifest
 import android.content.DialogInterface
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.location.Address
@@ -13,10 +14,10 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import androidx.appcompat.widget.SearchView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.widget.SearchView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -26,6 +27,7 @@ import com.google.android.gms.maps.*
 import com.google.android.gms.maps.model.*
 import com.google.android.libraries.places.api.Places
 import com.google.android.libraries.places.api.net.PlacesClient
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.loopj.android.http.AsyncHttpClient
 import com.loopj.android.http.JsonHttpResponseHandler
 import cz.msebera.android.httpclient.Header
@@ -83,6 +85,10 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
         places.setOnClickListener {
             openPlacesDialog()
         }
+        val fab = view.findViewById<FloatingActionButton>(R.id.floatingActionButton)
+        fab.setOnClickListener{
+            shareLocation()
+        }
 
         val searchView = view.findViewById<SearchView>(R.id.idSearchView);
         searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
@@ -114,7 +120,7 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
                     latLng?.let {
                         map?.addMarker(MarkerOptions().position(it).title(location))
                         map?.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 10f))
-                    } ?: Toast.makeText(activity,"Not found",Toast.LENGTH_LONG).show()
+                    } ?: Toast.makeText(activity, "Not found", Toast.LENGTH_LONG).show()
 
                 }
                 return false
@@ -208,6 +214,21 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
         }]
     }
 
+    private fun shareLocation(){
+        currentLocation?.let {
+            val latitude: Double = it.latitude
+            val longitude: Double = it.longitude
+
+            val uri = "http://maps.google.com/maps?location=$latitude,$longitude"
+
+            val sharingIntent = Intent(Intent.ACTION_SEND)
+            sharingIntent.type = "text/plain"
+            val ShareSub = "Here is my location"
+            sharingIntent.putExtra(Intent.EXTRA_SUBJECT, ShareSub)
+            sharingIntent.putExtra(Intent.EXTRA_TEXT, uri)
+            startActivity(Intent.createChooser(sharingIntent, "Share via"))
+        }
+    }
     private fun extractPolyLine(response: JSONObject) {
         val directionHelper = DirectionHelper()
         var routes = directionHelper.parse(response)
