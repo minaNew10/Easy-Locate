@@ -14,18 +14,17 @@ class DirectionHelper {
         var jSteps: JSONArray
         try {
             jRoutes = jObject.getJSONArray("routes")
-            /** Traversing all routes  */
+
             for (i in 0 until jRoutes.length()) {
                 jLegs = (jRoutes[i] as JSONObject).getJSONArray("legs")
-                val path = arrayListOf<HashMap<String,String>>()
-                /** Traversing all legs  */
+                val path = arrayListOf<HashMap<String, String>>()
+
                 for (j in 0 until jLegs.length()) {
                     jSteps = (jLegs[j] as JSONObject).getJSONArray("steps")
-                    /** Traversing all steps  */
                     for (k in 0 until jSteps.length()) {
-                        var polyline: String = ((jSteps[k] as JSONObject)["polyline"] as JSONObject)["points"] as String
+                        var polyline: String =
+                            ((jSteps[k] as JSONObject)["polyline"] as JSONObject)["points"] as String
                         val list = decodePoly(polyline)
-                        /** Traversing all points  */
                         for (l in list.indices) {
                             val hm: HashMap<String, String> = HashMap()
                             hm["lat"] = list[l].latitude.toString()

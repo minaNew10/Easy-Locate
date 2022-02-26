@@ -64,32 +64,38 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        populateDummyData()
+        initVars()
+        initViews(view)
+    }
+
+    private fun initVars() {
         val mapFragment = childFragmentManager.findFragmentById(R.id.map) as SupportMapFragment?
         mapFragment?.getMapAsync(this)
         Places.initialize(context, getString(R.string.google_maps_key))
         placesClient = Places.createClient(context)
 
-        // Construct a FusedLocationProviderClient.
         context?.let {
             fusedLocationProviderClient =
                 LocationServices.getFusedLocationProviderClient(
                     it
                 )
         }
+    }
+
+    private fun initViews(view: View) {
         val restaurants = view.findViewById<Button>(R.id.btn_restaurants)
+        val places = view.findViewById<Button>(R.id.btn_places)
+        val fab = view.findViewById<FloatingActionButton>(R.id.floatingActionButton)
         restaurants.setOnClickListener {
             findNearByRestaurants()
         }
-        val places = view.findViewById<Button>(R.id.btn_places)
-        populateDummyData()
         places.setOnClickListener {
             openPlacesDialog()
         }
-        val fab = view.findViewById<FloatingActionButton>(R.id.floatingActionButton)
-        fab.setOnClickListener{
+        fab.setOnClickListener {
             shareLocation()
         }
-
         val searchView = view.findViewById<SearchView>(R.id.idSearchView);
         searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String): Boolean {
@@ -130,7 +136,6 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
                 return false
             }
         })
-        mapFragment?.getMapAsync(this)
     }
 
     private fun populateDummyData() {
@@ -185,10 +190,43 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
         }]
     }
 
-    private fun requestDirection(location: LatLng) {
+    private fun extractRestaurantNamesAndLocation(response: JSONObject) {
+        val restaurantsArray = response.getJSONArray("results")
+        for (i in 0 until restaurantsArray.length()) {
+            val restJSONObject = restaurantsArray.getJSONObject(i)
+            val name = restJSONObject.getString("name")
+            restaurantsNames.add(name)
+            val geometry = restJSONObject.getJSONObject("geometry")
+            val location = geometry.getJSONObject("location")
+            val latLng = LatLng(location.getDouble("lat"), location.getDouble("lng"))
+            restaurantsLatLngs.add(latLng)
+            Log.i(
+                TAG,
+                "extractRestaurantNamesAndLocation: $name lat ${latLng.latitude} lng ${latLng.longitude}"
+            )
+        }
+        viewRestaurantsOnMap()
+    }
+
+    private fun viewRestaurantsOnMap() {
+        for (i in 0 until restaurantsLatLngs.size) {
+
+            map?.addMarker(
+                MarkerOptions().position(restaurantsLatLngs.get(i)).title(
+                    restaurantsNames[i]
+                )
+            )
+
+            map?.animateCamera(CameraUpdateFactory.zoomTo(18.0f))
+
+            map?.moveCamera(CameraUpdateFactory.newLatLng(restaurantsLatLngs.get(i)))
+        }
+    }
+
+    private fun requestDirection(destination: LatLng) {
         val client = AsyncHttpClient()
         val url =
-            "https://maps.googleapis.com/maps/api/directions/json?origin=${currentLocation?.latitude},${currentLocation?.longitude}&destination=${location.latitude},${location.longitude}&key=${
+            "https://maps.googleapis.com/maps/api/directions/json?origin=${currentLocation?.latitude},${currentLocation?.longitude}&destination=${destination.latitude},${destination.longitude}&key=${
                 getString(
                     R.string.google_maps_key
                 )
@@ -199,7 +237,7 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
                 response: JSONObject
             ) {
                 Log.d(TAG, "onSuccess: $response")
-                extractPolyLine(response)
+                parseDirectionResponse(response)
             }
 
             override fun onFailure(
@@ -214,22 +252,7 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
         }]
     }
 
-    private fun shareLocation(){
-        currentLocation?.let {
-            val latitude: Double = it.latitude
-            val longitude: Double = it.longitude
-
-            val uri = "http://maps.google.com/maps?location=$latitude,$longitude"
-
-            val sharingIntent = Intent(Intent.ACTION_SEND)
-            sharingIntent.type = "text/plain"
-            val ShareSub = "Here is my location"
-            sharingIntent.putExtra(Intent.EXTRA_SUBJECT, ShareSub)
-            sharingIntent.putExtra(Intent.EXTRA_TEXT, uri)
-            startActivity(Intent.createChooser(sharingIntent, "Share via"))
-        }
-    }
-    private fun extractPolyLine(response: JSONObject) {
+    private fun parseDirectionResponse(response: JSONObject) {
         val directionHelper = DirectionHelper()
         var routes = directionHelper.parse(response)
 
@@ -257,40 +280,19 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
         map?.addPolyline(lineOptions)
     }
 
-    private fun extractRestaurantNamesAndLocation(response: JSONObject) {
-        val restaurantsArray = response.getJSONArray("results")
-        for (i in 0 until restaurantsArray.length()) {
-            val restJSONObject = restaurantsArray.getJSONObject(i)
-            val name = restJSONObject.getString("name")
-            restaurantsNames.add(name)
-            val geometry = restJSONObject.getJSONObject("geometry")
-            val location = geometry.getJSONObject("location")
-            val latLng = LatLng(location.getDouble("lat"), location.getDouble("lng"))
-            restaurantsLatLngs.add(latLng)
-            Log.i(
-                TAG,
-                "extractRestaurantNamesAndLocation: $name lat ${latLng.latitude} lng ${latLng.longitude}"
-            )
+    private fun shareLocation() {
+        currentLocation?.let {
+            val latitude: Double = it.latitude
+            val longitude: Double = it.longitude
 
-        }
-        viewRestaurantsOnMap()
-    }
+            val uri = "http://maps.google.com/maps?location=$latitude,$longitude"
 
-    private fun viewRestaurantsOnMap() {
-        for (i in 0 until restaurantsLatLngs.size) {
-
-            // below line is use to add marker to each location of our array list.
-            map?.addMarker(
-                MarkerOptions().position(restaurantsLatLngs.get(i)).title(
-                    restaurantsNames[i]
-                )
-            )
-
-            // below lin is use to zoom our camera on map.
-            map?.animateCamera(CameraUpdateFactory.zoomTo(18.0f))
-
-            // below line is use to move our camera to the specific location.
-            map?.moveCamera(CameraUpdateFactory.newLatLng(restaurantsLatLngs.get(i)))
+            val sharingIntent = Intent(Intent.ACTION_SEND)
+            sharingIntent.type = "text/plain"
+            val shareSub = getString(R.string.share_subject)
+            sharingIntent.putExtra(Intent.EXTRA_SUBJECT, shareSub)
+            sharingIntent.putExtra(Intent.EXTRA_TEXT, uri)
+            startActivity(Intent.createChooser(sharingIntent, "Share via"))
         }
     }
 
@@ -299,15 +301,12 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
             DialogInterface.OnClickListener { dialog, which -> // The "which" argument contains the position of the selected item.
                 val markerLatLng = likelyPlaceLatLngs[which] ?: return@OnClickListener
 
-                // Add a marker for the selected place, with an info window
-                // showing information about that place.
                 map?.addMarker(
                     MarkerOptions()
                         .title(likelyPlaceNames[which])
                         .position(markerLatLng)
                 )
 
-                // Position the map's camera at the location of the marker.
                 map?.moveCamera(
                     CameraUpdateFactory.newLatLngZoom(
                         markerLatLng,
@@ -316,7 +315,6 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
                 )
             }
 
-        // Display the dialog.
         context?.let {
             AlertDialog.Builder(it)
                 .setTitle("Pick place")
@@ -333,8 +331,6 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
         locationPermissionGranted = false
         when (requestCode) {
             PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION -> {
-
-                // If request is cancelled, the result arrays are empty.
                 if (grantResults.isNotEmpty() &&
                     grantResults[0] == PackageManager.PERMISSION_GRANTED
                 ) {
@@ -347,11 +343,6 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
     }
 
     private fun getLocationPermission() {
-        /*
-         * Request location permission, so that we can get the location of the
-         * device. The result of the permission request is handled by a callback,
-         * onRequestPermissionsResult.
-         */
         context?.applicationContext?.let {
             if (ContextCompat.checkSelfPermission(
                     it,
@@ -376,13 +367,11 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
         this.map = googleMap
 
         this.map?.setInfoWindowAdapter(object : GoogleMap.InfoWindowAdapter {
-            // Return null here, so that getInfoContents() is called next.
             override fun getInfoWindow(arg0: Marker): View? {
                 return null
             }
 
             override fun getInfoContents(marker: Marker): View {
-                // Inflate the layouts for the info window, title and snippet.
                 val infoWindow = layoutInflater.inflate(
                     R.layout.custom_info_content,
                     null
@@ -428,7 +417,6 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
     }
 
     private fun getDeviceLocation() {
-        Log.i(TAG, "getDeviceLocation: ")
         try {
             if (locationPermissionGranted) {
                 Log.i(TAG, "getDeviceLocation: location permission granted")
@@ -439,7 +427,6 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
                     locationResult.addOnCompleteListener(it) { task ->
                         if (task.isSuccessful) {
                             Log.i(TAG, "getDeviceLocation: task successful")
-                            // Set the map's camera position to the current location of the device.
                             currentLocation = task.result
                             if (currentLocation != null) {
                                 Log.i(TAG, "getDeviceLocation: Location is not null")
@@ -462,8 +449,6 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
 
                             }
                         } else {
-                            Log.i(TAG, "getDeviceLocation: location is null")
-                            Log.d(TAG, "Current location is null. Using defaults.")
                             Log.e(TAG, "Exception: %s", task.exception)
                             map?.moveCamera(
                                 CameraUpdateFactory
@@ -472,7 +457,7 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
                             map?.uiSettings?.isMyLocationButtonEnabled = false
                         }
                     }
-                } ?: Log.i(TAG, "getDeviceLocation activity null")
+                }
             } else {
                 Log.i(TAG, "getDeviceLocation: not granted")
             }
@@ -484,15 +469,6 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
     companion object {
         private val TAG = MapsFragment::class.java.simpleName
         private const val DEFAULT_ZOOM = 15
-
         private const val PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1
-
-        // Keys for storing activity state.
-        private const val KEY_CAMERA_POSITION = "camera_position"
-
-        private const val KEY_LOCATION = "location"
-
-        // Used for selecting the current place.
-        private const val M_MAX_ENTRIES = 5
     }
 }
