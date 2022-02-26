@@ -335,6 +335,8 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
                     grantResults[0] == PackageManager.PERMISSION_GRANTED
                 ) {
                     locationPermissionGranted = true
+                    Log.i(TAG, "onRequestPermissionsResult: location permission granted ")
+                    getDeviceLocation()
                 }
             }
             else -> super.onRequestPermissionsResult(requestCode, permissions, grantResults)
@@ -352,12 +354,10 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
             ) {
                 locationPermissionGranted = true
             } else {
-                activity?.let { activity ->
-                    ActivityCompat.requestPermissions(
-                        activity, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                    requestPermissions(
+                         arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
                         PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION
                     )
-                }
             }
         }
 
